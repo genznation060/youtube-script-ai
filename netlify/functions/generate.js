@@ -48,10 +48,10 @@ exports.handler = async (event) => {
       };
     }
 
-    // 6. Initialize Gemini Model (Using fast & cheap gemini-1.5-flash)
+    // 6. Initialize Gemini Model (Updated to gemini-2.0-flash)
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       generationConfig: {
         responseMimeType: "application/json", // Enforces strict JSON output
       },
@@ -124,4 +124,3 @@ RULES:
     };
   }
 };
-  
