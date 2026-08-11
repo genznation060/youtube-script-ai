@@ -1,6 +1,6 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+import { GoogleGenAI } from "@google/genai";
 
-exports.handler = async (event) => {
+export async function handler(event) {
   // 1. Setup CORS Headers
   const headers = {
     "Access-Control-Allow-Origin": "*",
@@ -48,14 +48,8 @@ exports.handler = async (event) => {
       };
     }
 
-    // 6. Initialize Gemini Model (Updated to gemini-2.0-flash)
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
-      generationConfig: {
-        responseMimeType: "application/json", // Enforces strict JSON output
-      },
-    });
+    // 6. Initialize Google GenAI Client
+    const client = new GoogleGenAI({ apiKey });
 
     // 7. Prompt Engineering
     const prompt = `You are an expert YouTube scriptwriter who creates high-retention videos.
@@ -69,52 +63,72 @@ TONE: ${tone || "Entertaining and informative"}
 STYLE: ${style || "Talking head"}
 LANGUAGE: ${language || "English"}
 
-Return JSON matching this exact structure:
-
-{
-  "titles": [
-    "Title option 1 with curiosity and benefit",
-    "Title option 2 with curiosity and benefit",
-    "Title option 3 with curiosity and benefit"
-  ],
-  "description": "Full SEO-optimized YouTube description. Include short summary, timestamps if possible, CTA, and 3-4 hashtags.",
-  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5", "tag6", "tag7", "tag8", "tag9", "tag10"],
-  "script": {
-    "hook": "Powerful 5-15 second hook creating curiosity or tension.",
-    "intro": "Short intro expanding the hook and promising value.",
-    "sections": [
-      {
-        "timestamp": "0:45",
-        "title": "Section name",
-        "content": "Full spoken script for this section using short conversational sentences."
-      }
-    ],
-    "cta": "Natural call-to-action before the end.",
-    "outro": "Short memorable outro reinforcing the main takeaway."
-  }
-}
-
 RULES:
 - Write in natural spoken language easy to say out loud.
 - Strong curiosity hook in the first 10 seconds.
 - Use open loops and pattern interrupts to keep retention high.
 - Include clear timestamps for sections.`;
 
-    // 8. Generate Content
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+    // 8. Create Interaction with Structured JSON Response
+    const interaction = await client.interactions.create({
+      model: "gemini-3.6-flash",
+      input: prompt,
+      store: false, // Set to false if you don't need server-side history for stateless function execution
+      response_format: [
+        {
+          type: "text",
+          mime_type: "application/json",
+          schema: {
+            type: "object",
+            properties: {
+              titles: {
+                type: "array",
+                items: { type: "string" },
+              },
+              description: { type: "string" },
+              tags: {
+                type: "array",
+                items: { type: "string" },
+              },
+              script: {
+                type: "object",
+                properties: {
+                  hook: { type: "string" },
+                  intro: { type: "string" },
+                  sections: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        timestamp: { type: "string" },
+                        title: { type: "string" },
+                        content: { type: "string" },
+                      },
+                      required: ["timestamp", "title", "content"],
+                    },
+                  },
+                  cta: { type: "string" },
+                  outro: { type: "string" },
+                },
+                required: ["hook", "intro", "sections", "cta", "outro"],
+              },
+            },
+            required: ["titles", "description", "tags", "script"],
+          },
+        },
+      ],
+    });
 
-    // 9. Parse and return JSON
-    const data = JSON.parse(responseText);
+    // 9. Extract and parse JSON output
+    const data = JSON.parse(interaction.output_text);
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify(data),
     };
-
   } catch (error) {
-    console.error("Gemini Execution Error:", error);
+    console.error("Gemini Interaction Execution Error:", error);
     return {
       statusCode: 500,
       headers,
@@ -123,4 +137,4 @@ RULES:
       }),
     };
   }
-};
+}
